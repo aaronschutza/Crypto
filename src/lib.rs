@@ -1,5 +1,6 @@
 // src/lib.rs
 pub mod flutter_topology;
+pub mod vdf;
 
 // Placeholder for the Octonion algebra (to be defined next)
 // We will determine Field Size (u32 vs u64) after testing stability

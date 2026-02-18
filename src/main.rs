@@ -1,5 +1,5 @@
-//src/main.rs
-
+// Change 'crate::' to 'olc_research::' to reference the library module from the binary
+use olc_research::vdf;
 use sha2::{Sha256, Digest}; // Standard hash for message digest
 
 // --- IOT OPTIMIZATION: u16 FIELD ---
@@ -300,4 +300,7 @@ fn main() {
     } else {
         println!("\n[FAIL] Verification Failed.");
     }
+
+    // 6. Run the VDF Benchmark from the new module
+    vdf::run_benchmark();
 }
