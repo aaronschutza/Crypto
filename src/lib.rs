@@ -10,8 +10,9 @@ pub struct Octonion {
 }
 
 impl Octonion {
-    pub fn mul(a: Octonion, b: Octonion) -> Octonion {
+    pub fn mul(_a: Octonion, _b: Octonion) -> Octonion {
         // Placeholder for Cayley-Dickson multiplication
+        // Prefixed with underscore to silence unused variable warnings
         Octonion { c: [0; 8] }
     }
 }
