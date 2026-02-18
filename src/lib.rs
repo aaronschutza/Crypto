@@ -1,10 +1,14 @@
 // src/lib.rs
 pub mod flutter_topology;
 pub mod vdf;
+pub mod sedenion;
+pub mod gsh;
+pub mod synergeia_sim;
+pub mod hdwallet;
 
 // Placeholder for the Octonion algebra (to be defined next)
 // We will determine Field Size (u32 vs u64) after testing stability
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq)] // Added PartialEq/Eq for Sedenion usage
 pub struct Octonion {
     // Placeholder coefficients
     pub c: [u64; 8], 
