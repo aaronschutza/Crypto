@@ -2,9 +2,47 @@ use olc_research::vdf;
 use olc_research::gsh;
 use olc_research::synergeia_sim;
 use olc_research::hdwallet;
+use olc_research::flt_cipher;
 
 
 fn main() {
+
+    println!("=== FLUTTER: IoT Vacuum Cipher ===");
+    
+    // 1. Define Key and Nonce (128-bit each)
+    let key = [0x1337, 0xC0DE, 0xDEAD, 0xBEEF, 0xCAFE, 0xBABE, 0x8080, 0xFFFF];
+    let nonce = [0, 1, 2, 3, 4, 5, 6, 7];
+
+    println!("Key: {:X?}", key);
+    println!("Nonce: {:X?}", nonce);
+
+    // 2. Initialize Cipher
+    let mut flutter = flt_cipher::FlutterCipher::new(key, nonce);
+    println!("\n[System Initialized]");
+    println!("State (Post-Warmup): {:?}", flutter.state);
+
+    // 3. Encrypt a Payload
+    let payload = b"Hello, Vacuum!";
+    let mut buffer = payload.to_vec();
+    
+    println!("\nOriginal: {:?}", String::from_utf8_lossy(&buffer));
+    
+    flutter.process(&mut buffer);
+    println!("Encrypted (Hex): {:02X?}", buffer);
+
+    // 4. Decrypt (Re-init cipher with same key/nonce)
+    let mut decryptor = flt_cipher::FlutterCipher::new(key, nonce);
+    decryptor.process(&mut buffer);
+    
+    println!("Decrypted: {:?}", String::from_utf8_lossy(&buffer));
+    
+    if buffer == payload {
+        println!("\n[SUCCESS] Integrity Check Passed.");
+    } else {
+        println!("\n[FAIL] Decryption mismatch.");
+    }
+
+
     println!("=== FLUTTER ENGINE: Bi-Octonion HD Wallet ===");
 
     // 1. Setup Engine (Cosmological Constant)
