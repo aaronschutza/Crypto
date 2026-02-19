@@ -3,9 +3,49 @@ use olc_research::gsh;
 use olc_research::synergeia_sim;
 use olc_research::hdwallet;
 use olc_research::flt_cipher;
+use olc_research::jordan_sig;
 
 
 fn main() {
+
+    println!("\n\n===========================================");
+    println!("=== JORDAN-DILITHIUM: Post-Quantum Sig ===");
+    println!("===========================================");
+    
+    // 1. Key Generation
+    println!("[1] Generating Keys (Lattice setup)...");
+    let mut rng = rand::thread_rng();
+    let keypair = jordan_sig::JordanSchnorr::keygen(&mut rng);
+    println!("    Public Key Generator (Alpha): {}", keypair.pub_key.a.alpha);
+    println!("    Public Key Target (Alpha): {}", keypair.pub_key.t.alpha);
+
+    // 2. Signing
+    let tx_msg = b"User A sends 50 BTC to User B";
+    println!("\n[2] Signing Transaction: {:?}", String::from_utf8_lossy(tx_msg));
+    let signature = jordan_sig::JordanSchnorr::sign(&keypair, tx_msg, &mut rng);
+    println!("    Signature Challenge (c): {}", signature.c);
+    println!("    Signature Response (z alpha): {}", signature.z.alpha);
+
+    // 3. Verification
+    println!("\n[3] Verifying Transaction...");
+    let valid = jordan_sig::JordanSchnorr::verify(&keypair.pub_key, tx_msg, &signature);
+    
+    if valid {
+        println!("    [SUCCESS] Signature is VALID.");
+        println!("    Artin's Theorem bypassed via scalar challenge.");
+    } else {
+        println!("    [FAILURE] Invalid Signature.");
+    }
+    
+    // 4. Forgery Test
+    println!("\n[4] Attempting Forgery...");
+    let fake_msg = b"User A sends 5000 BTC to User B";
+    let valid_forge = jordan_sig::JordanSchnorr::verify(&keypair.pub_key, fake_msg, &signature);
+    if !valid_forge {
+        println!("    [SUCCESS] Forgery detected and rejected.");
+    } else {
+        println!("    [FAILURE] Forgery accepted!");
+    }
 
     println!("=== FLUTTER: IoT Vacuum Cipher ===");
     

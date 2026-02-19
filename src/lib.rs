@@ -7,6 +7,7 @@ pub mod synergeia_sim;
 pub mod hdwallet;
 pub mod albert;
 pub mod flt_cipher;
+pub mod jordan_sig;
 
 // Placeholder for the Octonion algebra (to be defined next)
 // We will determine Field Size (u32 vs u64) after testing stability
