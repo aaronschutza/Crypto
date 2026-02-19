@@ -4,9 +4,71 @@ use olc_research::synergeia_sim;
 use olc_research::hdwallet;
 use olc_research::flt_cipher;
 use olc_research::jordan_sig;
+use olc_research::horizon;
 
 
 fn main() {
+
+    println!("===========================================");
+    println!("=== HORIZON: Stateless PQ Blockchain ===");
+    println!("===========================================");
+    println!("State Model: Holographic (Root encodes Bulk)");
+
+    // 1. Setup: Create the Global Accumulator (The "Bulk")
+    let mut accumulator = horizon::HorizonAccumulator::new();
+    let mut rng = rand::thread_rng();
+
+    // 2. User A receives a UTXO (Minting)
+    println!("[1] Minting UTXO for User A...");
+    let alice_keys = jordan_sig::JordanSchnorr::keygen(&mut rng);
+    let bob_keys = jordan_sig::JordanSchnorr::keygen(&mut rng);
+
+    let utxo_a = horizon::Utxo {
+        id: [0xAA; 32],
+        owner: alice_keys.pub_key,
+        amount: 50,
+    };
+    
+    // Position in the tree (Address space)
+    let utxo_index = 12345; 
+    accumulator.add_utxo(&utxo_a, utxo_index);
+    
+    let genesis_root = accumulator.root.clone();
+    println!("    Genesis Horizon (Root): {}...", &genesis_root[0..16]);
+
+    // 3. Stateless Validator comes online
+    // It knows ONLY the Root, not the UTXO set.
+    let validator = horizon::HorizonValidator::new(genesis_root.clone());
+
+    // 4. User A creates a Transaction to User B
+    println!("\n[2] User A creates Transaction (A -> B)...");
+    
+    // A. User A generates their own Witness (Merkle Proof)
+    // This is the "Holographic Projection" of their funds.
+    let witness = accumulator.generate_witness(utxo_index);
+    
+    // B. User A Signs the UTXO
+    let msg = utxo_a.hash().into_bytes();
+    let sig = jordan_sig::JordanSchnorr::sign(&alice_keys, &msg, &mut rng);
+
+    let tx = horizon::Transaction {
+        input_utxo: utxo_a,
+        witness: witness,
+        signature: sig,
+        new_owner: bob_keys.pub_key,
+        new_amount: 50,
+    };
+
+    // 5. Validator Processes Tx (Statelessly)
+    println!("\n[3] Validator verifying Tx (Stateless)...");
+    match validator.process_transaction(&tx) {
+        Some(new_root) => {
+            println!("    [SUCCESS] Transaction Valid.");
+            println!("    Old Horizon: {}...", &validator.state_root[0..16]);
+            println!("    New Horizon: {}...", &new_root[0..16]);
+        },
+        None => println!("    [FAILURE] Transaction Invalid."),
+    }
 
     println!("\n\n===========================================");
     println!("=== JORDAN-DILITHIUM: Post-Quantum Sig ===");
