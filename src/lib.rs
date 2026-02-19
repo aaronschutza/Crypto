@@ -8,7 +8,8 @@ pub mod hdwallet;
 pub mod albert;
 pub mod flt_cipher;
 pub mod jordan_sig;
-pub mod horizon; // <--- The Horizon Protocol
+pub mod horizon;
+pub mod horizon_net;
 
 // Placeholder for the Octonion algebra
 #[derive(Clone, Debug, Copy, PartialEq, Eq)] 

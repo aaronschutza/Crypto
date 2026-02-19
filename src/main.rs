@@ -5,6 +5,7 @@ use olc_research::hdwallet;
 use olc_research::flt_cipher;
 use olc_research::jordan_sig;
 use olc_research::horizon;
+use olc_research::horizon_net;
 
 
 fn main() {
@@ -69,6 +70,37 @@ fn main() {
         },
         None => println!("    [FAILURE] Transaction Invalid."),
     }
+
+    println!("=== HORIZON: Network Bootstrapping Demo ===");
+
+    // 1. Genesis
+    let genesis_root = "GENESIS_ROOT_HASH_0000".to_string();
+    
+    // 2. Node A (Local) - Has 1 block
+    let mut node_a = horizon_net::HorizonPeer::new(genesis_root.clone());
+    node_a.mine_next_block("STATE_ROOT_A1".to_string(), 1000); // 1000 iterations
+
+    // 3. Node B (Remote) - Has 3 blocks (Longer/Heavier chain)
+    let mut node_b = horizon_net::HorizonPeer::new(genesis_root.clone());
+    node_b.mine_next_block("STATE_ROOT_B1".to_string(), 1000);
+    node_b.mine_next_block("STATE_ROOT_B2".to_string(), 1000);
+    node_b.mine_next_block("STATE_ROOT_B3".to_string(), 1000);
+
+    println!("Node A Tip: {}...", node_a.current_horizon);
+    println!("Node B Tip: {}...", node_b.current_horizon);
+
+    // 4. Node A bootstraps from Node B
+    // In a stateful chain, A would need to download blocks B1, B2, B3 AND verify all Tx.
+    // In Horizon, A only verifies the VDFs in the headers.
+    horizon_net::NetworkBootstrapper::sync(&mut node_a, &node_b.chain);
+
+    println!("Node A New Tip: {}...", node_a.current_horizon);
+    
+    if node_a.current_horizon == node_b.current_horizon {
+        println!("[SUCCESS] Instant Bootstrap complete.");
+        println!("Node A is ready to validate transactions on the new Horizon.");
+    }
+
 
     println!("\n\n===========================================");
     println!("=== JORDAN-DILITHIUM: Post-Quantum Sig ===");
