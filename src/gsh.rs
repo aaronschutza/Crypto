@@ -3,8 +3,7 @@
 // Reference: "Geometry in Action", Section 33.
 // Mechanism: Sedenion Associator Sponge.
 
-use crate::sedenion::{Sedenion, associator};
-use crate::vdf::Octonion;
+use crate::sedenion::{Octonion, Sedenion, associator};
 
 pub struct GSH256 {
     state: Sedenion,

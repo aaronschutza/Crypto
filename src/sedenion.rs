@@ -3,8 +3,128 @@
 // Sedenions are Non-Commutative, Non-Associative, and Non-Alternative.
 // They represent the "Chaos" phase of the APH vacuum (Beta -> 0).
 
-use crate::vdf::Octonion; // Reuse the robust Octonion from VDF module
+//use crate::vdf::Octonion; // Reuse the robust Octonion from VDF module
 use std::ops::{Add, Mul, BitXor};
+
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Octonion {
+    pub coeffs: [u64; 8],
+}
+
+impl Octonion {
+    pub fn new(coeffs: [u64; 8]) -> Self {
+        Octonion { coeffs }
+    }
+
+    pub fn zero() -> Self {
+        Octonion { coeffs: [0; 8] }
+    }
+
+    // A heuristic "random" generator for the seed
+    pub fn from_seed(seed: u64) -> Self {
+        let s = seed;
+        Octonion::new([
+            s,
+            s.wrapping_mul(6364136223846793005).wrapping_add(1),
+            s.rotate_left(13),
+            s.rotate_right(7),
+            s ^ 0xCAFEBABECAFEBABE,
+            !s,
+            s.wrapping_add(0xDEADBEEF),
+            s.wrapping_mul(0x123456789ABCDEF0)
+        ])
+    }
+
+    // Returns a u64 "norm" (sum of squares modulo 2^64).
+    pub fn norm_sq(&self) -> u64 {
+        self.coeffs.iter().fold(0u64, |acc, &x| acc.wrapping_add(x.wrapping_mul(x)))
+    }
+
+    // Check if exactly zero
+    pub fn is_zero(&self) -> bool {
+        self.coeffs.iter().all(|&x| x == 0)
+    }
+
+    // Rotate coefficients to create a 3rd independent generator
+    // This breaks Artin's Theorem (2-generator associativity)
+    pub fn rotate(&self) -> Self {
+        let mut new_c = [0; 8];
+        for i in 0..8 {
+            new_c[i] = self.coeffs[(i + 1) % 8];
+        }
+        Octonion::new(new_c)
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Arithmetic Implementation (Cayley-Dickson over Z_2^64)
+// ----------------------------------------------------------------------------
+impl Add for Octonion {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        let mut c = [0; 8];
+        for i in 0..8 { c[i] = self.coeffs[i].wrapping_add(other.coeffs[i]); }
+        Octonion::new(c)
+    }
+}
+
+// Full non-associative multiplication
+impl Mul for Octonion {
+    type Output = Self;
+    fn mul(self, other: Self) -> Self {
+        let a = &self.coeffs;
+        let b = &other.coeffs;
+        let mut res = [0; 8];
+        
+        // Optimized naive multiplication for benchmarking
+        // Real part
+        res[0] = a[0].wrapping_mul(b[0])
+            .wrapping_sub(a[1].wrapping_mul(b[1])).wrapping_sub(a[2].wrapping_mul(b[2]))
+            .wrapping_sub(a[3].wrapping_mul(b[3])).wrapping_sub(a[4].wrapping_mul(b[4]))
+            .wrapping_sub(a[5].wrapping_mul(b[5])).wrapping_sub(a[6].wrapping_mul(b[6]))
+            .wrapping_sub(a[7].wrapping_mul(b[7]));
+
+        // Imaginary parts
+        res[1] = a[0].wrapping_mul(b[1]).wrapping_add(a[1].wrapping_mul(b[0]))
+            .wrapping_add(a[2].wrapping_mul(b[3])).wrapping_sub(a[3].wrapping_mul(b[2]))
+            .wrapping_add(a[4].wrapping_mul(b[5])).wrapping_sub(a[5].wrapping_mul(b[4]))
+            .wrapping_sub(a[6].wrapping_mul(b[7])).wrapping_add(a[7].wrapping_mul(b[6]));
+
+        res[2] = a[0].wrapping_mul(b[2]).wrapping_sub(a[1].wrapping_mul(b[3]))
+            .wrapping_add(a[2].wrapping_mul(b[0])).wrapping_add(a[3].wrapping_mul(b[1]))
+            .wrapping_add(a[4].wrapping_mul(b[6])).wrapping_add(a[5].wrapping_mul(b[7]))
+            .wrapping_sub(a[6].wrapping_mul(b[4])).wrapping_sub(a[7].wrapping_mul(b[5]));
+               
+        res[3] = a[0].wrapping_mul(b[3]).wrapping_add(a[1].wrapping_mul(b[2]))
+            .wrapping_sub(a[2].wrapping_mul(b[1])).wrapping_add(a[3].wrapping_mul(b[0]))
+            .wrapping_add(a[4].wrapping_mul(b[7])).wrapping_sub(a[5].wrapping_mul(b[6]))
+            .wrapping_add(a[6].wrapping_mul(b[5])).wrapping_sub(a[7].wrapping_mul(b[4]));
+
+        res[4] = a[0].wrapping_mul(b[4]).wrapping_sub(a[1].wrapping_mul(b[5]))
+            .wrapping_sub(a[2].wrapping_mul(b[6])).wrapping_sub(a[3].wrapping_mul(b[7]))
+            .wrapping_add(a[4].wrapping_mul(b[0])).wrapping_add(a[5].wrapping_mul(b[1]))
+            .wrapping_add(a[6].wrapping_mul(b[2])).wrapping_add(a[7].wrapping_mul(b[3]));
+
+        res[5] = a[0].wrapping_mul(b[5]).wrapping_add(a[1].wrapping_mul(b[4]))
+            .wrapping_sub(a[2].wrapping_mul(b[7])).wrapping_add(a[3].wrapping_mul(b[6]))
+            .wrapping_sub(a[4].wrapping_mul(b[1])).wrapping_add(a[5].wrapping_mul(b[0]))
+            .wrapping_sub(a[6].wrapping_mul(b[3])).wrapping_add(a[7].wrapping_mul(b[2]));
+
+        res[6] = a[0].wrapping_mul(b[6]).wrapping_add(a[1].wrapping_mul(b[7]))
+            .wrapping_add(a[2].wrapping_mul(b[4])).wrapping_sub(a[3].wrapping_mul(b[5]))
+            .wrapping_sub(a[4].wrapping_mul(b[2])).wrapping_add(a[5].wrapping_mul(b[3]))
+            .wrapping_add(a[6].wrapping_mul(b[0])).wrapping_sub(a[7].wrapping_mul(b[1]));
+
+        res[7] = a[0].wrapping_mul(b[7]).wrapping_sub(a[1].wrapping_mul(b[6]))
+            .wrapping_add(a[2].wrapping_mul(b[5])).wrapping_add(a[3].wrapping_mul(b[4]))
+            .wrapping_sub(a[4].wrapping_mul(b[3])).wrapping_sub(a[5].wrapping_mul(b[2]))
+            .wrapping_add(a[6].wrapping_mul(b[1])).wrapping_add(a[7].wrapping_mul(b[0]));
+
+        Octonion::new(res)
+    }
+}
+
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Sedenion {

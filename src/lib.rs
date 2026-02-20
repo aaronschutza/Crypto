@@ -10,6 +10,7 @@ pub mod flt_cipher;
 pub mod jordan_sig;
 pub mod horizon;
 pub mod horizon_net;
+pub mod stark;
 
 // Placeholder for the Octonion algebra
 #[derive(Clone, Debug, Copy, PartialEq, Eq)] 
