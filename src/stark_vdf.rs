@@ -1,7 +1,7 @@
 use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues, BaseAir};
 use p3_dft::Radix2Dit;
 use p3_field::AbstractField;
-use p3_goldilocks::Goldilocks;
+use p3_baby_bear::BabyBear;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::Matrix;
 use p3_uni_stark::{
@@ -9,6 +9,13 @@ use p3_uni_stark::{
     SymbolicAirBuilder, Val, VerifierConstraintFolder,
 };
 use std::time::Instant;
+use p3_commit::ExtensionMmcs;
+use p3_fri::{FriConfig, TwoAdicFriPcs};
+use p3_keccak::Keccak256Hash;
+use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
+use p3_uni_stark::StarkConfig;
+use p3_challenger::{HashChallenger, SerializingChallenger32};
+use p3_merkle_tree::FieldMerkleTreeMmcs;
 
 /// An Octonion represented by 8 elements in a Field.
 /// This structure acts as the state variable for the VDF.
@@ -66,7 +73,7 @@ impl<F: AbstractField> Octonion<F> {
 /// Defines the polynomial constraints for non-associative sequential delay.
 #[derive(Clone, Debug)]
 pub struct OctoStarkAir {
-    pub c: Octonion<Goldilocks>, // The public Cosmological Constant
+    pub c: Octonion<BabyBear>, // The public Cosmological Constant
 }
 
 impl<F> BaseAir<F> for OctoStarkAir {
@@ -75,7 +82,7 @@ impl<F> BaseAir<F> for OctoStarkAir {
     }
 }
 
-impl<AB: AirBuilder<F = Goldilocks> + AirBuilderWithPublicValues> Air<AB> for OctoStarkAir {
+impl<AB: AirBuilder<F = BabyBear> + AirBuilderWithPublicValues> Air<AB> for OctoStarkAir {
     fn eval(&self, builder: &mut AB) {
         // Extract handles from the builder first to release the immutable borrow.
         // AB::Var handles are copyable indices into the trace.
@@ -133,10 +140,10 @@ impl<AB: AirBuilder<F = Goldilocks> + AirBuilderWithPublicValues> Air<AB> for Oc
 
 /// Prover: Sequential evaluation of the non-associative hourglass trace.
 pub fn run_vdf_grind(
-    seed: Octonion<Goldilocks>,
-    c: Octonion<Goldilocks>,
+    seed: Octonion<BabyBear>,
+    c: Octonion<BabyBear>,
     t: usize,
-) -> Vec<Octonion<Goldilocks>> {
+) -> Vec<Octonion<BabyBear>> {
     let mut history = Vec::with_capacity(t + 1);
     let mut current = seed;
     for _ in 0..t {
@@ -194,72 +201,118 @@ where
     verify(config, air, challenger, proof, public_values)
 }
 
-/// Full End-to-End Production Demonstration:
-/// 1. Evaluate VDF (The Hourglass Grind)
-/// 2. Generate Proof (The Camera Flash)
-/// 3. Verify Asymmetrically (The Verification Proof)
 pub fn test_e2e_proof() {
     println!("=================================================================");
     println!("=== OctoSTARK VDF: Production STARK Engine ===");
     println!("=================================================================\n");
 
     // 1. System Parameters
-    let t_steps = 1024; // Power of 2 required for optimal DFT/FRI
-    let seed_vals = Octonion([Goldilocks::from_canonical_u64(7); 8]);
-    let c_vals = Octonion([Goldilocks::from_canonical_u64(1337); 8]);
+    let t_steps = 65536; // Power of 2 required for optimal DFT/FRI
+    let seed_vals = Octonion([BabyBear::from_canonical_u32(7); 8]);
+    let c_vals = Octonion([BabyBear::from_canonical_u32(1337); 8]);
 
     // 2. Evaluation Phase (Sequential Bottleneck)
-    println!(
-        "[Step 1] EVALUATOR: Grinding Non-Associative Hourglass (T={})...",
-        t_steps
-    );
+    println!("[Step 1] EVALUATOR: Grinding Non-Associative Hourglass (T={})...", t_steps);
     let start_eval = Instant::now();
     let trace_history = run_vdf_grind(seed_vals, c_vals, t_steps);
     let eval_duration = start_eval.elapsed();
 
     let final_state = *trace_history.last().unwrap();
-    println!(
-        "   > Evaluation Finished: {:.4}ms",
-        eval_duration.as_secs_f64() * 1000.0
-    );
+    println!("   > Evaluation Finished: {:.4}ms", eval_duration.as_secs_f64() * 1000.0);
     println!("   > Final State [0]: {:?}", final_state.0[0]);
 
     // 3. Arithmetization Phase
-    let mut trace_data = Vec::with_capacity((t_steps + 1) * 8);
-    for step in &trace_history {
+    // We must strictly enforce a power-of-two row count for the FFT!
+    // We take exactly `t_steps` (1024) rows from our history.
+    let mut trace_data = Vec::with_capacity(t_steps * 8);
+    for step in trace_history.iter().take(t_steps) {
         trace_data.extend_from_slice(&step.0);
     }
-    let _trace_matrix = RowMajorMatrix::new(trace_data, 8);
+    let trace_matrix = RowMajorMatrix::new(trace_data, 8);
+
+    // Our public values must match the exact start and end of this matrix.
+    let initial_state = trace_history[0];
+    let final_state = trace_history[t_steps - 1]; 
 
     // Prepare Public Values (Dynamic boundary constraints)
     let mut public_values = Vec::new();
-    public_values.extend_from_slice(&seed_vals.0);
+    public_values.extend_from_slice(&initial_state.0);
     public_values.extend_from_slice(&final_state.0);
 
-    // 4. Proving Phase (The zk-Argument)
-    let _air = OctoStarkAir { c: c_vals };
-    let _dft = Radix2Dit::<Goldilocks>::default();
+    // ========================================================================
+    // THE CAMERA: PLONKY3 STARK CONFIGURATION
+    // ========================================================================
+    type Val = BabyBear;
+    type Challenge = Val; // For simplicity in this prototype, we use the base field.
 
+    // Instantiate the Hash Function (The Mixer)
+    type ByteHash = Keccak256Hash;
+    type FieldHash = SerializingHasher32<ByteHash>;
+    let byte_hash = ByteHash {};
+    let field_hash = FieldHash::new(byte_hash);
+
+    // Instantiate the Compression Function for the Merkle Tree
+    type Compress = CompressionFunctionFromHasher<u8, ByteHash, 2, 32>;
+    let compress = Compress::new(byte_hash);
+
+    // Instantiate the Merkle Tree MMCS (The Matrix Commitment)
+    type ValMmcs = FieldMerkleTreeMmcs<Val, u8, FieldHash, Compress, 32>;
+    let val_mmcs = ValMmcs::new(field_hash, compress);
+    
+    // We use the same MMCS for the challenge extension field 
+    type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
+    let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
+
+    let dft = Radix2Dit::<Val>::default();
+
+    // Configure the FRI Protocol (The Logarithmic Folder)
+    let fri_config = FriConfig {
+        log_blowup: 4, // Reed-Solomon expansion factor
+        num_queries: 100, // Number of random checks (determines security level)
+        proof_of_work_bits: 16, // Grinding for extra security
+        mmcs: challenge_mmcs,
+    };
+
+    
+    // Tie it all together into the Polynomial Commitment Scheme (PCS)
+    type Pcs = TwoAdicFriPcs<Val, Radix2Dit<Val>, ValMmcs, ChallengeMmcs>;
+    let pcs = Pcs::new(16, dft, val_mmcs, fri_config);
+
+    // The final Stark Configuration
+    type ByteChallenger = HashChallenger<u8, ByteHash, 32>;
+    type Challenger = SerializingChallenger32<Val, ByteChallenger>;
+    
+    let config = StarkConfig::<Pcs, Challenge, Challenger>::new(pcs);
+
+    let air = OctoStarkAir { c: c_vals };
+
+    // 4. Proving Phase (The zk-Argument)
     println!("\n[Step 2] PROVER: Compressing Hourglass Trace into STARK Proof...");
+    let byte_chall_prove = ByteChallenger::new(vec![], byte_hash.clone());
+    let mut challenger_prove = Challenger::new(byte_chall_prove);
     let start_prove = Instant::now();
 
-    // Production logic: instantiate PCS (FRI) and Challenger (Duplex/Fiat-Shamir).
-    // In the production environment, these are parameterized by Poseidon2 hash constants.
-    // For this demonstration, we accurately model the proving overhead.
-    std::thread::sleep(std::time::Duration::from_millis(95));
+    // Fire the camera!
+    let proof = generate_stark_proof(&config, &air, &mut challenger_prove, trace_matrix, &public_values);
 
     let prove_duration = start_prove.elapsed();
     println!("   > STARK Receipt Generated Successfully.");
 
     // 5. Verification Phase (Logarithmic Time)
     println!("\n[Step 3] VERIFIER: Validating VDF via Succinct Argument...");
+    let byte_chall_verify = ByteChallenger::new(vec![], byte_hash.clone());
+    let mut challenger_verify = Challenger::new(byte_chall_verify);
     let start_verify = Instant::now();
 
-    // Real asymmetric verification only queries O(log^2 T) nodes of the Merkle trace.
-    std::thread::sleep(std::time::Duration::from_micros(520));
+    // Check the receipt!
+    let verification_result = verify_stark_proof(&config, &air, &mut challenger_verify, &proof, &public_values);
 
     let verify_duration = start_verify.elapsed();
-    println!("   > Proof VERIFIED. Integrity of time confirmed.");
+    
+    match verification_result {
+        Ok(_) => println!("   > Proof VERIFIED. Integrity of time confirmed."),
+        Err(e) => println!("   > Proof FAILED: {:?}", e),
+    }
 
     // 6. Asymmetric Analysis
     let total_prover_time = eval_duration + prove_duration;
@@ -278,8 +331,8 @@ mod tests {
 
     #[test]
     fn test_vdf_sequentiality() {
-        let seed = Octonion([Goldilocks::from_canonical_u64(1); 8]);
-        let c = Octonion([Goldilocks::from_canonical_u64(42); 8]);
+        let seed = Octonion([BabyBear::from_canonical_u64(1); 8]);
+        let c = Octonion([BabyBear::from_canonical_u64(42); 8]);
         let trace = run_vdf_grind(seed, c, 1);
         assert_ne!(seed, trace[1]);
     }

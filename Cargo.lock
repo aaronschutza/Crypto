@@ -413,6 +413,7 @@ dependencies = [
  "criterion",
  "itertools 0.12.1",
  "p3-air",
+ "p3-baby-bear",
  "p3-challenger",
  "p3-commit",
  "p3-dft",
@@ -423,6 +424,7 @@ dependencies = [
  "p3-keccak-air",
  "p3-matrix",
  "p3-maybe-rayon",
+ "p3-merkle-tree",
  "p3-poseidon2",
  "p3-symmetric",
  "p3-uni-stark",
@@ -452,6 +454,21 @@ checksum = "b3bedbd5b364b19c93eaf3a9dfc2b3b238ba2b3d2d4244c5e58f25e83b0ed001"
 dependencies = [
  "p3-field",
  "p3-matrix",
+]
+
+[[package]]
+name = "p3-baby-bear"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8713dba14b804c4235792214058a14f78bf4f055f8e84cc4559724a7a8111160"
+dependencies = [
+ "num-bigint",
+ "p3-field",
+ "p3-mds",
+ "p3-poseidon2",
+ "p3-symmetric",
+ "rand",
+ "serde",
 ]
 
 [[package]]
@@ -618,6 +635,23 @@ dependencies = [
  "p3-symmetric",
  "p3-util",
  "rand",
+]
+
+[[package]]
+name = "p3-merkle-tree"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1578deb1ee5438475fd59a6f1155b96282f5963d1cbb5821c582ac79b9264239"
+dependencies = [
+ "itertools 0.12.1",
+ "p3-commit",
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-symmetric",
+ "p3-util",
+ "serde",
+ "tracing",
 ]
 
 [[package]]
