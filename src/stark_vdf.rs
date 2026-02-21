@@ -207,7 +207,8 @@ pub fn test_e2e_proof() {
     println!("=================================================================\n");
 
     // 1. System Parameters
-    let t_steps = 65536; // Power of 2 required for optimal DFT/FRI
+    let t_steps = 32768;
+    // Power of 2 required for optimal DFT/FRI
     let seed_vals = Octonion([BabyBear::from_canonical_u32(7); 8]);
     let c_vals = Octonion([BabyBear::from_canonical_u32(1337); 8]);
 
@@ -276,7 +277,7 @@ pub fn test_e2e_proof() {
     
     // Tie it all together into the Polynomial Commitment Scheme (PCS)
     type Pcs = TwoAdicFriPcs<Val, Radix2Dit<Val>, ValMmcs, ChallengeMmcs>;
-    let pcs = Pcs::new(16, dft, val_mmcs, fri_config);
+    let pcs = Pcs::new(15, dft, val_mmcs, fri_config);
 
     // The final Stark Configuration
     type ByteChallenger = HashChallenger<u8, ByteHash, 32>;
@@ -296,6 +297,7 @@ pub fn test_e2e_proof() {
     let proof = generate_stark_proof(&config, &air, &mut challenger_prove, trace_matrix, &public_values);
 
     let prove_duration = start_prove.elapsed();
+    println!("   > Evaluation Finished: {:.4}ms", prove_duration.as_secs_f64() * 1000.0);
     println!("   > STARK Receipt Generated Successfully.");
 
     // 5. Verification Phase (Logarithmic Time)
