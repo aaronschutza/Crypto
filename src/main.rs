@@ -1,4 +1,3 @@
-use olc_research::vdf;
 use olc_research::gsh;
 use olc_research::synergeia_sim;
 use olc_research::hdwallet;
@@ -6,77 +5,15 @@ use olc_research::flt_cipher;
 use olc_research::jordan_sig;
 use olc_research::horizon;
 use olc_research::horizon_net;
-use olc_research::stark;
 use olc_research::stark_vdf;
-use std::time::Instant;
 
 
 fn main() {
-    stark_vdf::test_octostark_vdf_trace();
+    
+    println!("===========================================");
     stark_vdf::test_e2e_proof();
-    println!("\n=================================================================");
-    println!("=== OctoSTARK VDF: End-to-End Asymmetric Verification ===");
-    println!("=================================================================\n");
 
-    let iterations = 200_000;
-    let security_queries = 40; // \lambda parameter for FRI
-    
-    let c = vdf::Octonion::from_seed(12345);
-    let z_0 = vdf::Octonion::from_seed(67890);
-
-    // ------------------------------------------------------------------------
-    // PHASE 1: VDF EVALUATION (Symmetric Delay, O(T) Time)
-    // ------------------------------------------------------------------------
-    println!("[Phase 1] Prover: Evaluating VDF (T = {} iterations)...", iterations);
-    let start_eval = Instant::now();
-    
-    let stark_output = vdf::evaluate_vdf(z_0, c, iterations);
-    
-    let eval_time = start_eval.elapsed();
-    println!("   > VDF Evaluation Complete in {:.4}s", eval_time.as_secs_f64());
-    println!("   > Final State [0]: {:?}", stark_output.final_state.coeffs[0].0);
-
-    let pub_inputs = stark::PublicInputs {
-        z_0,
-        c,
-        z_t: stark_output.final_state,
-        t_iterations: iterations,
-    };
-
-    // ------------------------------------------------------------------------
-    // PHASE 2: PROOF GENERATION (O(T log^2 T) Time)
-    // ------------------------------------------------------------------------
-    println!("\n[Phase 2] Prover: Generating zk-STARK Proof from Execution Trace...");
-    let start_prove = Instant::now();
-    
-    let proof = stark::StarkProver::prove(&stark_output.trace, &pub_inputs, security_queries);
-    
-    let prove_time = start_prove.elapsed();
-    println!("   > STARK Proof Generated in {:.4}s", prove_time.as_secs_f64());
-    println!("   > Number of FRI trace queries sampled: {}", proof.queried_rows.len());
-
-    // ------------------------------------------------------------------------
-    // PHASE 3: ASYMMETRIC VERIFICATION (O(log^2 T) Time)
-    // ------------------------------------------------------------------------
-    println!("\n[Phase 3] Verifier: Validating VDF Asymmetrically...");
-    let start_verify = Instant::now();
-    
-    let is_valid = stark::StarkVerifier::verify(&proof, &pub_inputs);
-    
-    let verify_time = start_verify.elapsed();
-    
-    if is_valid {
-        println!("   > RESULT: VDF Payload VERIFIED SUCCESSFULLY!");
-    } else {
-        println!("   > RESULT: VDF Payload REJECTED.");
-    }
-    
-    println!("   > Verification Time: {:.6}s", verify_time.as_secs_f64());
-    
-    let total_prover_time = eval_time.as_secs_f64() + prove_time.as_secs_f64();
-    let asymmetry = total_prover_time / verify_time.as_secs_f64();
-    println!("   > Asymmetric Speedup: {:.0}x", asymmetry);
-    println!("=================================================================\n");
+    println!("===========================================");
 
     println!("===========================================");
     println!("=== HORIZON: Stateless PQ Blockchain ===");
