@@ -13,7 +13,7 @@ use std::time::Instant;
 
 fn main() {
     stark_vdf::test_octostark_vdf_trace();
-
+    stark_vdf::test_e2e_proof();
     println!("\n=================================================================");
     println!("=== OctoSTARK VDF: End-to-End Asymmetric Verification ===");
     println!("=================================================================\n");

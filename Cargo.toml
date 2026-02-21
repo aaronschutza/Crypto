@@ -12,6 +12,8 @@ p3-field = "0.1.0"
 p3-goldilocks = "0.1.0"
 p3-matrix = "0.1.0"
 p3-air = "0.1.0"
+p3-dft = "0.1.0"
+p3-keccak = "0.1.0"
 
 # Proof System Components
 p3-uni-stark = "0.1.0"
