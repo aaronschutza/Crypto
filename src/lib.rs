@@ -11,6 +11,7 @@ pub mod jordan_sig;
 pub mod horizon;
 pub mod horizon_net;
 pub mod stark;
+pub mod stark_vdf;
 
 // Placeholder for the Octonion algebra
 #[derive(Clone, Debug, Copy, PartialEq, Eq)] 

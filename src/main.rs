@@ -7,10 +7,12 @@ use olc_research::jordan_sig;
 use olc_research::horizon;
 use olc_research::horizon_net;
 use olc_research::stark;
+use olc_research::stark_vdf;
 use std::time::Instant;
 
 
 fn main() {
+    stark_vdf::test_octostark_vdf_trace();
 
     println!("\n=================================================================");
     println!("=== OctoSTARK VDF: End-to-End Asymmetric Verification ===");
