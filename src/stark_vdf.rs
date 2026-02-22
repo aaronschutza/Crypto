@@ -4,8 +4,12 @@ use p3_field::AbstractField;
 use p3_baby_bear::BabyBear;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::Matrix;
+
+#[cfg(debug_assertions)]
+use p3_uni_stark::DebugConstraintBuilder;
+
 use p3_uni_stark::{
-    prove, verify, DebugConstraintBuilder, ProverConstraintFolder, StarkGenericConfig,
+    prove, verify, ProverConstraintFolder, StarkGenericConfig,
     SymbolicAirBuilder, Val, VerifierConstraintFolder,
 };
 use std::time::Instant;
@@ -170,6 +174,7 @@ pub fn run_vdf_grind(
 // ============================================================================
 
 /// Generates a production-grade zk-STARK proof for the OctoSTARK hourglass.
+#[cfg(debug_assertions)]
 pub fn generate_stark_proof<SC, A>(
     config: &SC,
     air: &A,
@@ -182,6 +187,25 @@ where
     A: for<'a> Air<ProverConstraintFolder<'a, SC>>
         + Air<SymbolicAirBuilder<Val<SC>>>
         + for<'a> Air<DebugConstraintBuilder<'a, Val<SC>>>,
+{
+    prove(config, air, challenger, trace, public_values)
+}
+
+// -----------------------------------------------------------------
+// RELEASE MODE: Stripped down for absolute maximum speed
+// -----------------------------------------------------------------
+#[cfg(not(debug_assertions))]
+pub fn generate_stark_proof<SC, A>(
+    config: &SC,
+    air: &A,
+    challenger: &mut SC::Challenger,
+    trace: RowMajorMatrix<Val<SC>>,
+    public_values: &Vec<Val<SC>>,
+) -> p3_uni_stark::Proof<SC>
+where
+    SC: StarkGenericConfig,
+    A: for<'a> Air<ProverConstraintFolder<'a, SC>>
+        + Air<SymbolicAirBuilder<Val<SC>>>,
 {
     prove(config, air, challenger, trace, public_values)
 }
@@ -207,7 +231,11 @@ pub fn test_e2e_proof() {
     println!("=================================================================\n");
 
     // 1. System Parameters
-    let t_steps = 32768;
+    #[cfg(debug_assertions)]
+    let pow_steps = 16;
+    #[cfg(not(debug_assertions))]
+    let pow_steps = 22;
+    let t_steps = 1 << pow_steps;
     // Power of 2 required for optimal DFT/FRI
     let seed_vals = Octonion([BabyBear::from_canonical_u32(7); 8]);
     let c_vals = Octonion([BabyBear::from_canonical_u32(1337); 8]);
@@ -277,7 +305,7 @@ pub fn test_e2e_proof() {
     
     // Tie it all together into the Polynomial Commitment Scheme (PCS)
     type Pcs = TwoAdicFriPcs<Val, Radix2Dit<Val>, ValMmcs, ChallengeMmcs>;
-    let pcs = Pcs::new(15, dft, val_mmcs, fri_config);
+    let pcs = Pcs::new(pow_steps, dft, val_mmcs, fri_config);
 
     // The final Stark Configuration
     type ByteChallenger = HashChallenger<u8, ByteHash, 32>;
